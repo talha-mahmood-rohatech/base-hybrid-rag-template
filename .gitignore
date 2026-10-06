@@ -1,0 +1,50 @@
+# --- Python -------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# --- Tooling caches -------------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Secrets / local configuration ------------------------------------------------
+# Real settings and API keys live in .env; the template (.env.example) is committed.
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# --- Runtime data (never commit) -------------------------------------------------
+# Downloaded embedding / reranker models (fastembed, tiktoken caches)
+.cache/
+# Uploaded raw documents (local BlobStore)
+data/
+# Evaluation outputs (python -m app.evaluation)
+reports/
+*.log
+
+# --- IDE / OS ----------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini

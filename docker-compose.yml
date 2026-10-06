@@ -1,0 +1,128 @@
+name: hybrid-rag
+
+# Shared settings for every container running the platform image.
+x-app: &app
+  build:
+    context: .
+  image: hybrid-rag:0.1.0
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE__URL: postgresql+asyncpg://rag:rag@postgres:5432/rag
+    QDRANT__URL: http://qdrant:6333
+    LLM__BASE_URL: ${LLM__BASE_URL:-http://ollama:11434/v1}
+    STORAGE__BLOB_DIR: /data/blobs
+    FASTEMBED_CACHE_PATH: /models/fastembed
+    TIKTOKEN_CACHE_DIR: /models/tiktoken
+    HF_HUB_DISABLE_PROGRESS_BARS: "1"
+  volumes:
+    - model_cache:/models
+    - blob_data:/data/blobs
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.2
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    command: ["uvicorn", "app.main:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      qdrant:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+        required: false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      # First start downloads the embedding + reranker models into the model_cache volume.
+      start_period: 900s
+    restart: unless-stopped
+
+  # Optional dedicated ingestion worker (set WORKER__EMBEDDED=false on the api to use only this).
+  worker:
+    <<: *app
+    profiles: ["worker"]
+    command: ["python", "-m", "app.ingestion.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Local LLM (OpenAI-compatible API). Enabled with COMPOSE_PROFILES=local-llm.
+  ollama:
+    image: ollama/ollama:0.35.1
+    profiles: ["local-llm"]
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  ollama-pull:
+    image: ollama/ollama:0.35.1
+    profiles: ["local-llm"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${LLM__MODEL:-qwen2.5:3b}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  pg_data:
+  qdrant_data:
+  model_cache:
+  blob_data:
+  ollama_data:

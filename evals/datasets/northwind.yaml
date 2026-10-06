@@ -1,0 +1,57 @@
+# Golden set over the sample corpus. Relevance = document + passage snippet, so it stays
+# valid across chunk sizes and embedding models.
+name: northwind-policies
+documents:
+  - {external_id: refund_policy, path: ../../samples/refund_policy.md}
+  - {external_id: security_handbook, path: ../../samples/security_handbook.html}
+  - {external_id: product_faq, path: ../../samples/product_faq.txt}
+  - {external_id: sla, path: ../../samples/sla_agreement.pdf}
+  - {external_id: employee_handbook, path: ../../samples/employee_handbook.docx}
+
+queries:
+  - id: q1
+    query: Can I get my money back on a monthly subscription?
+    relevant: [{external_id: refund_policy, contains: "Monthly subscriptions can be refunded"}]
+    reference_answer: Yes, in full if requested within 30 days of the initial purchase.
+  - id: q2
+    query: What happens if I cancel an annual plan after two months?
+    relevant: [{external_id: refund_policy, contains: "prorated refund"}]
+  - id: q3
+    query: Are API overage charges refundable?
+    relevant: [{external_id: refund_policy, contains: "never refundable"}]
+  - id: q4
+    query: How long do refunds take to arrive?
+    relevant: [{external_id: refund_policy, contains: "5 to 10 business days"}]
+  - id: q5
+    query: How quickly must a security incident be reported?
+    relevant: [{external_id: security_handbook, contains: "within 24 hours"}]
+  - id: q6
+    query: What is the minimum password length?
+    relevant: [{external_id: security_handbook, contains: "14 characters"}]
+  - id: q7
+    query: How long is customer data kept after an account is deleted?
+    relevant: [{external_id: security_handbook, contains: "90 days"}]
+  - id: q8
+    query: What is the request limit for the API on the Enterprise plan?
+    relevant: [{external_id: product_faq, contains: "5,000"}]
+  - id: q9
+    query: In which geographic locations can I host my workspace?
+    relevant: [{external_id: product_faq, contains: "Frankfurt"}]
+  - id: q10
+    query: What uptime does Northwind guarantee?
+    relevant: [{external_id: sla, contains: "99.95%"}]
+  - id: q11
+    query: What compensation do I get if availability drops below 99%?
+    relevant: [{external_id: sla, contains: "25%"}]
+  - id: q12
+    query: How fast is the first response for a production outage?
+    relevant: [{external_id: sla, contains: "30 minutes"}]
+  - id: q13
+    query: How many vacation days do employees get?
+    relevant: [{external_id: employee_handbook, contains: "25 days"}]
+  - id: q14
+    query: What is the hotel budget per night when travelling for work?
+    relevant: [{external_id: employee_handbook, contains: "180 EUR"}]
+  - id: q15
+    query: How many days a week can staff work from home?
+    relevant: [{external_id: employee_handbook, contains: "3 days per week"}]

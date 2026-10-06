@@ -1,0 +1,13 @@
+Northwind Cloud Product FAQ
+
+What are the API rate limits?
+The public REST API allows 1,000 requests per minute per API key on the Standard plan and 5,000
+requests per minute on the Enterprise plan. Requests over the limit receive HTTP 429 responses.
+
+Which regions are available?
+Northwind Cloud runs in three regions: eu-central (Frankfurt), us-east (Virginia) and ap-south
+(Singapore). Data never leaves the region selected when the workspace is created.
+
+Can I export my data?
+Yes. Workspace owners can export all data as Parquet or JSON from Settings > Export at any time.
+Exports larger than 50 GB are delivered to a customer-owned object storage bucket.

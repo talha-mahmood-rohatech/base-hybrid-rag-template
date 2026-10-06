@@ -1,0 +1,58 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R 10 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Title (Northwind Cloud Service Level Agreement) /Producer (hybrid-rag samples) >>
+endobj
+5 0 obj
+<< /Length 410 >>
+stream
+BT /F1 11 Tf 50 750 Td 14 TL (Northwind Cloud Service Level Agreement) Tj T* (1. Uptime Commitment) Tj T* (Northwind Cloud commits to a monthly uptime of 99.95% for the Compute and Storage) Tj T* (services. Uptime is measured by external probes every minute from three independent) Tj T* (locations. Scheduled maintenance announced at least 7 days in advance is excluded from the) Tj T* (calculation.) Tj T* ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+7 0 obj
+<< /Length 417 >>
+stream
+BT /F1 11 Tf 50 750 Td 14 TL (2. Service Credits) Tj T* (If monthly uptime falls below 99.95%, customers receive a service credit of 10% of the) Tj T* (monthly fee. If uptime falls below 99.0%, the credit increases to 25% of the monthly fee.) Tj T* (If uptime falls below 95.0%, the credit is 50% of the monthly fee. Service credits must be) Tj T* (requested within 30 days of the end of the affected month.) Tj T* ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 7 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+9 0 obj
+<< /Length 352 >>
+stream
+BT /F1 11 Tf 50 750 Td 14 TL (3. Support Response Times) Tj T* (Severity 1 incidents \(production down\) receive a first response within 30 minutes, 24) Tj T* (hours a day. Severity 2 incidents \(degraded service\) receive a first response within 4) Tj T* (business hours. Severity 3 questions receive a first response within 2 business days.) Tj T* ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 3 0 R >> >> >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000128 00000 n 
+0000000198 00000 n 
+0000000299 00000 n 
+0000000760 00000 n 
+0000000886 00000 n 
+0000001354 00000 n 
+0000001480 00000 n 
+0000001883 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R /Info 4 0 R >>
+startxref
+2010
+%%EOF

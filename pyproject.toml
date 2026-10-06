@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hybrid-rag"
+version = "0.1.0"
+description = "Reusable multi-tenant hybrid RAG platform: Qdrant dense + PostgreSQL BM25 sparse retrieval, RRF fusion, cross-encoder reranking, grounded generation with citations."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "Proprietary" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Framework :: FastAPI",
+]
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings[yaml]>=2.6,<3.0",
+    "sqlalchemy[asyncio]>=2.0.36,<2.2",
+    "asyncpg>=0.30,<0.32",
+    "alembic>=1.14,<2.0",
+    "qdrant-client>=1.12,<2.0",
+    "httpx>=0.27,<0.29",
+    "tiktoken>=0.8,<1.0",
+    "pypdf>=5.0,<7.0",
+    "python-docx>=1.1,<2.0",
+    "beautifulsoup4>=4.12,<5.0",
+    "lxml>=5.3,<7.0",
+    "markdown-it-py>=3.0,<5.0",
+    "python-multipart>=0.0.12",
+    "pyyaml>=6.0,<7.0",
+    "numpy>=1.26,<3.0",
+]
+
+[project.optional-dependencies]
+# Local ONNX embedding + cross-encoder reranking models (no torch required).
+local-models = ["fastembed>=0.5,<0.9"]
+anthropic = ["anthropic>=0.40"]
+dev = [
+    "pytest>=8.3,<10",
+    "pytest-asyncio>=0.24,<2",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[project.scripts]
+rag-cli = "app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
+ignore = ["B008", "RUF012", "E501"]  # line length is enforced by `ruff format`
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+markers = [
+    "integration: requires running PostgreSQL and Qdrant (docker compose up -d postgres qdrant)",
+    "models: downloads/uses real local ONNX models (slow)",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

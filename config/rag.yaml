@@ -1,0 +1,39 @@
+# Pipeline defaults. Environment variables (e.g. RETRIEVAL__RRF_K=60) override these.
+
+retrieval:
+  dense_top_k: 50        # Qdrant candidates
+  sparse_top_k: 50       # BM25 candidates
+  fusion: rrf            # rrf | relative_score
+  rrf_k: 60              # RRF(d) = sum 1 / (k + rank_i(d))
+  rrf_top_k: 40          # candidates passed to the reranker
+  final_top_k: 8         # chunks kept after reranking
+  sparse_provider: postgres_bm25   # postgres_bm25 | postgres_fts
+  bm25_k1: 1.2
+  bm25_b: 0.75
+  fts_language: english
+  tolerate_retriever_failure: true
+
+chunking:
+  strategy: recursive
+  chunk_size: 800
+  chunk_overlap: 120
+  unit: tokens
+
+context:
+  max_context_tokens: 6000
+  dedup_threshold: 0.85
+  ordering: grouped      # grouped (by document, in reading order) | relevance
+
+reranker:
+  provider: fastembed
+  model: jinaai/jina-reranker-v2-base-multilingual
+  batch_size: 16
+
+llm:
+  temperature: 0.0
+  max_tokens: 800
+
+worker:
+  embedded: true
+  poll_interval_s: 1.0
+  max_attempts: 3
