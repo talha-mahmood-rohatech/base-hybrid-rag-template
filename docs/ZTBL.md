@@ -69,6 +69,7 @@ Each variant re-embeds the corpus in a temporary tenant, which takes several min
 | jina-reranker-v2, top 20, capped at 800 chars | 0.80 | 1.00 | 0.892 | 14 s |
 | **jina-reranker-v2, top 20 (configured)** | **0.90** | **1.00** | **0.942** | **20 s** |
 | jina-reranker-v2, top 40 | 0.90 | 1.00 | 0.942 | 51 s |
+| bge-reranker-v2-m3 (int8 ONNX), top 20 | 0.85 | 1.00 | 0.917 | 43 s |
 
 End to end with the configured setup:
 

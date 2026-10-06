@@ -261,6 +261,7 @@ docker compose up -d --build
 | OpenAI embeddings (3072-d) | `EMBEDDING__PROVIDER=openai`, `EMBEDDING__MODEL=text-embedding-3-large`, `EMBEDDING__DIMENSION=3072`, `EMBEDDING__API_KEY=...`. Chunking can return to 800/120. |
 | Groq for answers | `LLM__PROVIDER=groq`, `LLM__MODEL=<model id from GET https://api.groq.com/openai/v1/models>`, `LLM__API_KEY=gsk_...`. Drop `local-llm` from `COMPOSE_PROFILES`. Rate-limit (429) responses are retried automatically, honouring `Retry-After`. |
 | Claude for answers | `LLM__PROVIDER=anthropic`, `LLM__MODEL=claude-opus-5-5`, `LLM__API_KEY=...` (optional: `LLM__EFFORT=low\|medium\|high`) |
+| Any Hugging Face ONNX cross-encoder | `RERANKER__MODEL=<name>`, `RERANKER__ONNX_REPO=<hf repo>`, `RERANKER__ONNX_FILE=onnx/model.onnx` (+ `RERANKER__ONNX_ADDITIONAL_FILES=["onnx/model.onnx_data"]` for large exports). `BAAI/bge-reranker-v2-m3` is pre-mapped to its int8 export: just set `RERANKER__MODEL=BAAI/bge-reranker-v2-m3`. It is multilingual with 8K context, but on CPU it was ~2× slower than jina-reranker-v2 on the ZTBL eval. |
 | Hosted reranker | `RERANKER__PROVIDER=cohere`, `RERANKER__MODEL=rerank-v3.5`, `RERANKER__API_KEY=...` |
 | Self-hosted OpenAI-compatible LLM (vLLM, LM Studio) | `LLM__PROVIDER=openai_compatible`, `LLM__BASE_URL=http://host:8000/v1`, `LLM__MODEL=...` |
 | BM25 alternative | `RETRIEVAL__SPARSE_PROVIDER=postgres_fts` |
