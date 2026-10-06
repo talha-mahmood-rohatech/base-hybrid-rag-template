@@ -124,3 +124,14 @@ async def test_extractive_llm_no_answer():
 def test_empty_context(ordering):
     built = ContextBuilder(TC, ordering=ordering).build([])
     assert built.blocks == [] and built.text == ""
+
+
+def test_fullwidth_citation_markers_are_normalised():
+    # gpt-oss style markers, including the "†source" variant and an invented id
+    built = ContextBuilder(TC).build([cand(A, name="a.md"), cand(B, name="b.md")])
+    res = extract_citations(
+        "Refunds take 30 days【1】. Usage is final【2†source】. Also【1, 2】 and【9】.", built
+    )
+    assert res.answer == "Refunds take 30 days[1]. Usage is final[2]. Also[1][2] and."
+    assert [c.citation_id for c in res.citations] == [1, 2]
+    assert res.invalid_ids == [9]

@@ -10,6 +10,8 @@ Elasticsearch is required.
   pipelines, BM25/RRF/reranking details, tenancy model, design decisions).
 - [docs/REUSE_GUIDE.md](docs/REUSE_GUIDE.md): how to reuse it. Integrating a product over the
   API, choosing models and operating it, and extending it with new providers or formats.
+- [docs/ZTBL.md](docs/ZTBL.md): worked example. ZTBL Islamic Banking knowledge base answered
+  with Groq.
 
 ```text
                          Product Apps
@@ -55,7 +57,7 @@ Upload (PDF/DOCX/MD/HTML/TXT) -> checksum / version -> ingestion job (PostgreSQL
 | Sparse | `SparseSearch` interface: `postgres_bm25` (default, true **Okapi BM25** computed in SQL from `tsvector` term frequencies with KB-scoped N/avgdl/df) and `postgres_fts` (`ts_rank_cd`). GIN index. |
 | Fusion | `FusionStrategy` interface: `ReciprocalRankFusion` (default, `RRF(d)=Σ w_i/(k+rank_i(d))`, k=60) and `RelativeScoreFusion`. Dense rank, sparse rank and RRF score are kept on each candidate. |
 | Reranking | `Reranker` interface: `fastembed` cross-encoder (default `jinaai/jina-reranker-v2-base-multilingual`), `cohere` (Rerank API), `none`. Both `rrf_score` and `reranker_score` are returned and traced. |
-| Generation | `LLMProvider` interface: `openai_compatible` (OpenAI, vLLM, **Ollama**), `anthropic` (Claude, default `claude-opus-5-5`), `extractive` (offline, quotes context verbatim). |
+| Generation | `LLMProvider` interface: `openai_compatible` (OpenAI, vLLM, **Ollama**), `groq` (Groq Cloud), `anthropic` (Claude, default `claude-opus-5-5`), `extractive` (offline, quotes context verbatim). |
 | Citations | The context is numbered `[1]..[n]` with document/section/page headers. Citation markers in the answer are parsed and validated. **Fabricated ids are stripped** and recorded in the trace. Each citation returns `document_id, document_name, document_version_id, chunk_id, page, section, source, snippet, rrf_score, reranker_score`. |
 | Multi-tenancy | Tenant → KnowledgeBase → Document → DocumentVersion → Chunk. Every row/vector carries `tenant_id` + `knowledge_base_id`. The tenant is derived **only from the API key**. Filters on `tenant_id`/`knowledge_base_id` are rejected (422). Other tenants' resources return 404. Qdrant results are re-checked, and hydration re-filters by tenant in SQL. |
 | Ingestion | Checksums (SHA-256), idempotent uploads (`unchanged`), versioning with active/inactive versions, deterministic chunk ids (safe retries), page/section/char offsets, metadata and permissions preserved on chunks and payloads. Jobs run on a PostgreSQL queue (`FOR UPDATE SKIP LOCKED`) with retries and backoff, either in the API process or as a separate worker. |

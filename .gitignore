@@ -48,3 +48,6 @@ reports/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Tenant credentials written by scripts/load_corpus.py
+.secrets/

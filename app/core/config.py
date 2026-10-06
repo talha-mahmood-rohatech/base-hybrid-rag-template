@@ -108,10 +108,19 @@ class RerankerSettings(BaseModel):
     timeout_s: float = 60.0
     # Include section/heading path in the text the cross-encoder sees.
     include_section: bool = True
+    # CPU latency controls. Cross-encoder cost grows with (candidates x passage length):
+    # rerank only the best N fused candidates (None = all rrf_top_k) ...
+    max_candidates: int | None = Field(default=None, ge=1, le=1000)
+    # ... and cap the passage text the cross-encoder reads (the LLM still gets the full chunk).
+    max_chars: int | None = Field(default=None, ge=100)
+    # fastembed only: use any cross-encoder with an ONNX export on Hugging Face.
+    onnx_repo: str | None = None  # e.g. "onnx-community/bge-reranker-v2-m3-ONNX"
+    onnx_file: str | None = None  # e.g. "onnx/model_int8.onnx"
+    onnx_additional_files: list[str] = Field(default_factory=list)  # e.g. ["onnx/model.onnx_data"]
 
 
 class LLMSettings(BaseModel):
-    provider: Literal["openai_compatible", "anthropic", "extractive"] = "openai_compatible"
+    provider: Literal["openai_compatible", "groq", "anthropic", "extractive"] = "openai_compatible"
     model: str = "qwen2.5:3b"
     base_url: str | None = "http://localhost:11434/v1"
     api_key: SecretStr | None = None

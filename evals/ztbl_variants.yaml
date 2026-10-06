@@ -1,0 +1,12 @@
+# Retrieval comparison on the ZTBL corpus (no LLM calls, so no Groq quota is used).
+# python -m app.evaluation --dataset evals/datasets/ztbl.yaml --variants evals/ztbl_variants.yaml
+k_values: [1, 3, 5, 8]
+
+variants:
+  - name: hybrid-rerank
+  - name: hybrid-norerank
+    rerank: false
+  - name: dense-only-rerank
+    use_sparse: false
+  - name: sparse-only-rerank
+    use_dense: false

@@ -259,6 +259,7 @@ docker compose up -d --build
 |---|---|
 | Fully local (default) | `EMBEDDING__PROVIDER=fastembed`, `EMBEDDING__MODEL=mixedbread-ai/mxbai-embed-large-v1`, `EMBEDDING__DIMENSION=1024`; `RERANKER__PROVIDER=fastembed`, `RERANKER__MODEL=jinaai/jina-reranker-v2-base-multilingual`; `LLM__PROVIDER=openai_compatible`, `LLM__BASE_URL=http://ollama:11434/v1`, `LLM__MODEL=qwen2.5:3b` |
 | OpenAI embeddings (3072-d) | `EMBEDDING__PROVIDER=openai`, `EMBEDDING__MODEL=text-embedding-3-large`, `EMBEDDING__DIMENSION=3072`, `EMBEDDING__API_KEY=...`. Chunking can return to 800/120. |
+| Groq for answers | `LLM__PROVIDER=groq`, `LLM__MODEL=<model id from GET https://api.groq.com/openai/v1/models>`, `LLM__API_KEY=gsk_...`. Drop `local-llm` from `COMPOSE_PROFILES`. Rate-limit (429) responses are retried automatically, honouring `Retry-After`. |
 | Claude for answers | `LLM__PROVIDER=anthropic`, `LLM__MODEL=claude-opus-5-5`, `LLM__API_KEY=...` (optional: `LLM__EFFORT=low\|medium\|high`) |
 | Hosted reranker | `RERANKER__PROVIDER=cohere`, `RERANKER__MODEL=rerank-v3.5`, `RERANKER__API_KEY=...` |
 | Self-hosted OpenAI-compatible LLM (vLLM, LM Studio) | `LLM__PROVIDER=openai_compatible`, `LLM__BASE_URL=http://host:8000/v1`, `LLM__MODEL=...` |
@@ -283,7 +284,7 @@ model needs instruction prefixes. Known models already have defaults in
 |---|---|
 | Ingestion throughput | Set `WORKER__EMBEDDED=false` on `api` and run N `worker` containers (`docker compose --profile worker up -d --scale worker=N`). Jobs are claimed with `SKIP LOCKED`. |
 | Query throughput | Run more `api` replicas behind a load balancer. They are stateless; models load per replica. |
-| Latency | Use a GPU or hosted LLM (generation dominates), reduce `top_k`, use a smaller reranker (`Xenova/ms-marco-MiniLM-L-12-v2`), or set `rerank:false` for latency-critical paths. |
+| Latency | On CPU the cross-encoder usually dominates; its cost grows with candidates × passage length. Set `RERANKER__MAX_CANDIDATES=20` (on the ZTBL eval, same quality as 40 at ~2.5× lower latency), use a smaller reranker (`Xenova/ms-marco-MiniLM-L-12-v2`, ~3× faster, slightly lower quality), run the reranker on a GPU or as a hosted API (`cohere`), or set `rerank:false` for latency-critical paths. `RERANKER__MAX_CHARS` truncates reranker input but measurably lowered quality on ZTBL. A hosted LLM (Groq, Anthropic, OpenAI) keeps generation under a few seconds. |
 | Large vector collections | `QDRANT__ON_DISK_VECTORS=true`, tune `QDRANT__HNSW_M` / `QDRANT__SEARCH_HNSW_EF`, or run a Qdrant cluster. |
 | Multi-node file storage | Implement `BlobStore` for S3/GCS (`app/ingestion/blobstore.py`). |
 

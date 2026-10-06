@@ -14,6 +14,8 @@ from typing import Any
 from app.generation.context import BuiltContext
 
 _CITE_RE = re.compile(r"\[(\d{1,3}(?:\s*,\s*\d{1,3})*)\]")
+# Some models (e.g. gpt-oss) cite with fullwidth brackets: 【7】, 【7, 8】 or 【7†source】.
+_FULLWIDTH_CITE_RE = re.compile(r"【\s*(\d{1,3}(?:\s*,\s*\d{1,3})*)\s*(?:†[^】]*)?】")
 
 
 @dataclass(slots=True)
@@ -59,7 +61,8 @@ def extract_citations(answer: str, context: BuiltContext) -> CitationResult:
                 invalid.append(i)
         return "".join(f"[{i}]" for i in valid)
 
-    cleaned = _CITE_RE.sub(_replace, answer)
+    normalized = _FULLWIDTH_CITE_RE.sub(lambda m: f"[{m.group(1)}]", answer)
+    cleaned = _CITE_RE.sub(_replace, normalized)
     cleaned = re.sub(r"[ \t]+([.,;:!?])", r"\1", cleaned)
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned).strip()
 

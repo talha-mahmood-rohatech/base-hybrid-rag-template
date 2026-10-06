@@ -84,3 +84,33 @@ async def test_rerank_disabled_per_request():
 async def test_score_count_mismatch_raises():
     with pytest.raises(ValueError):
         await RerankingStage(FixedReranker([0.1])).run("q", make(3), top_n=3)
+
+
+async def test_max_candidates_limits_cross_encoder_work():
+    seen = []
+
+    class Spy(LexicalReranker):
+        async def score(self, query, documents):
+            seen.append(len(documents))
+            return [float(i) for i in range(len(documents))]
+
+    cands = make(10)
+    out = await RerankingStage(Spy(), max_candidates=4).run("q", list(reversed(cands)), top_n=8)
+    assert seen == [4]
+    assert {c.fused_rank for c in out} == {1, 2, 3, 4}  # only the best-fused candidates were reranked
+    assert [c.final_rank for c in out] == [1, 2, 3, 4]
+
+
+async def test_max_chars_truncates_reranker_input_only():
+    seen = []
+
+    class Spy(LexicalReranker):
+        async def score(self, query, documents):
+            seen.extend(documents)
+            return [0.0] * len(documents)
+
+    cands = make(1)
+    cands[0].chunk.text = "x" * 500
+    out = await RerankingStage(Spy(), include_section=False, max_chars=100).run("q", cands, top_n=1)
+    assert seen == ["x" * 100]
+    assert len(out[0].chunk.text) == 500  # the LLM still receives the full chunk

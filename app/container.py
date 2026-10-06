@@ -89,7 +89,12 @@ class Container:
             vector_store=vector_store,
             embedders=embedders,
             sparse_search=sparse,
-            reranking=RerankingStage(reranker, include_section=settings.reranker.include_section),
+            reranking=RerankingStage(
+                reranker,
+                include_section=settings.reranker.include_section,
+                max_candidates=settings.reranker.max_candidates,
+                max_chars=settings.reranker.max_chars,
+            ),
             context_builder=ContextBuilder(
                 token_counter,
                 max_tokens=settings.context.max_context_tokens,

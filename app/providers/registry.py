@@ -73,7 +73,12 @@ def build_reranker(settings: RerankerSettings) -> Reranker:
         from app.providers.rerankers.fastembed_reranker import FastEmbedCrossEncoderReranker
 
         return FastEmbedCrossEncoderReranker(
-            settings.model, batch_size=settings.batch_size, cache_dir=model_cache_dir()
+            settings.model,
+            batch_size=settings.batch_size,
+            cache_dir=model_cache_dir(),
+            onnx_repo=settings.onnx_repo,
+            onnx_file=settings.onnx_file,
+            onnx_additional_files=settings.onnx_additional_files,
         )
     if settings.provider == "cohere":
         from app.providers.rerankers.cohere_reranker import CohereReranker
@@ -95,6 +100,16 @@ def build_llm(settings: LLMSettings) -> LLMProvider:
             settings.model,
             base_url=settings.base_url,
             api_key=_secret(settings.api_key),
+            timeout_s=settings.timeout_s,
+        )
+    if settings.provider == "groq":
+        from app.providers.llms.openai_compatible import GroqLLM
+
+        return GroqLLM(
+            settings.model,
+            api_key=_secret(settings.api_key),
+            # LLM__BASE_URL defaults to the local Ollama URL; only honour it if it points at Groq.
+            base_url=settings.base_url if settings.base_url and "groq" in settings.base_url else None,
             timeout_s=settings.timeout_s,
         )
     if settings.provider == "anthropic":
