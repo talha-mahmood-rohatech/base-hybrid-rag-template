@@ -171,7 +171,7 @@ class VoiceSettings(BaseModel):
     stt_api_key: SecretStr | None = None
     stt_base_url: str | None = None
     # Force the decode language (ISO code, e.g. "en"); None = auto-detect per utterance.
-    stt_language: str | None = None
+    stt_language: str | None = "en"
     # Vocabulary hint for Whisper (domain terms, product names), e.g.
     # "Riba, Ijarah, Murabaha, Musharakah, Mudarabah, Shariah". Clients can override per session.
     stt_prompt: str | None = None
