@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice RAG Console</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%232f6fed%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/voice/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <h1>Voice RAG Console</h1>
+        <p>Mic &rarr; Silero VAD &rarr; Whisper &rarr; hybrid RAG &rarr; spoken answer</p>
+      </div>
+    </div>
+    <div class="status">
+      <span id="conn-pill" class="pill off">Disconnected</span>
+      <button id="settings-toggle" class="ghost" type="button" hidden>Settings</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ------------------------------------------------------------ setup -->
+    <section id="setup" class="card setup">
+      <h2>Connect</h2>
+      <div class="grid">
+        <label class="span2">Tenant API key
+          <input id="api-key" type="password" autocomplete="off" placeholder="rag_…">
+        </label>
+        <label class="span2">Knowledge base
+          <select id="kb" disabled><option>Enter an API key first</option></select>
+        </label>
+        <label class="span3">Vocabulary hint <small>names &amp; jargon speech recognition should expect</small>
+          <input id="vocab" autocomplete="off" placeholder="e.g. Riba, Ijarah, Murabaha, Musharakah">
+        </label>
+        <label>Top-k sources
+          <input id="top-k" type="number" min="1" max="20" value="8">
+        </label>
+      </div>
+      <div class="setup-actions">
+        <label class="check"><input id="speak-answers" type="checkbox" checked> Speak answers aloud</label>
+        <button id="connect-btn" type="button" disabled>Connect &amp; enable mic</button>
+      </div>
+      <p id="setup-msg" class="muted"></p>
+    </section>
+
+    <!-- ------------------------------------------------------------ talk -->
+    <section id="talk" hidden>
+      <div class="card stage">
+        <button id="mic" type="button" aria-label="Microphone" aria-pressed="false">
+          <span class="ring" aria-hidden="true"></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+        </button>
+        <div class="stage-text">
+          <div id="mic-label" class="mic-label">Tap the mic and ask a question</div>
+          <div id="mic-hint" class="muted">Tap again to stop listening · tap while it speaks to interrupt</div>
+          <ol id="steps" class="steps" aria-label="Current turn">
+            <li data-step="heard"><span>Heard</span><b></b></li>
+            <li data-step="transcribed"><span>Transcribed</span><b></b></li>
+            <li data-step="answered"><span>Answered</span><b></b></li>
+            <li data-step="speaking"><span>Speaking</span><b></b></li>
+          </ol>
+        </div>
+      </div>
+
+      <div id="log" class="log" aria-live="polite">
+        <div id="empty" class="empty">
+          Ask something about the knowledge base &mdash; by voice, or type below.
+        </div>
+      </div>
+
+      <form id="ask-form" class="ask">
+        <input id="ask-input" placeholder="Type a question…" autocomplete="off">
+        <button type="submit">Ask</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ------------------------------------------------------------ trace drawer -->
+  <dialog id="trace">
+    <div class="trace-head">
+      <h2>Retrieval trace</h2>
+      <button id="trace-close" class="ghost" type="button" aria-label="Close">✕</button>
+    </div>
+    <div id="trace-body"></div>
+  </dialog>
+
+  <div id="toast" role="alert" hidden></div>
+
+  <template id="turn-tpl">
+    <article class="turn">
+      <div class="q">
+        <div class="q-text"></div>
+        <div class="q-meta"></div>
+      </div>
+      <div class="a pending">
+        <div class="a-text"><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="sources" hidden></div>
+        <div class="timing" hidden>
+          <div class="bar"></div>
+          <div class="legend"></div>
+        </div>
+        <div class="a-actions" hidden>
+          <button class="ghost replay" type="button">▶ Replay</button>
+          <button class="ghost inspect" type="button">Inspect trace</button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="/voice/audio/mic-stream.js"></script>
+  <script src="/voice/app.js"></script>
+</body>
+</html>

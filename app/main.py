@@ -4,18 +4,22 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import admin, documents, health, ingestion, knowledge_bases, rag, traces
+from app.api.routes import admin, documents, health, ingestion, knowledge_bases, rag, traces, voice
 from app.container import Container
 from app.core.config import Settings, get_settings
 from app.core.errors import RAGError
 from app.core.logging import configure_logging
 
 logger = logging.getLogger(__name__)
+
+VOICE_WEB_DIR = Path(__file__).resolve().parent / "voice" / "web"
 
 
 def create_app(settings: Settings | None = None, container: Container | None = None) -> FastAPI:
@@ -72,8 +76,14 @@ def create_app(settings: Settings | None = None, container: Container | None = N
             },
         )
 
-    for module in (health, admin, knowledge_bases, documents, ingestion, rag, traces):
+    for module in (health, admin, knowledge_bases, documents, ingestion, rag, traces, voice):
         app.include_router(module.router)
+    # Browser demo of the voice pipeline (mic -> VAD -> STT -> RAG -> TTS).
+    app.mount("/voice", StaticFiles(directory=str(VOICE_WEB_DIR), html=True), name="voice-demo")
+
+    @app.get("/", include_in_schema=False)
+    async def root() -> RedirectResponse:
+        return RedirectResponse("/voice/")
     return app
 
 

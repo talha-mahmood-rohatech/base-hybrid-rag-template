@@ -24,6 +24,8 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+from app.voice.vad.config import VadConfig
+
 DistanceMetric = Literal["cosine", "dot", "euclid"]
 
 
@@ -158,6 +160,49 @@ class TokenizerSettings(BaseModel):
     encoding: str = "cl100k_base"
 
 
+class VoiceSettings(BaseModel):
+    """Voice pipeline (mic -> Silero VAD -> STT -> hybrid RAG -> TTS), ported from the Leap agent."""
+
+    enabled: bool = True
+    # Speech-to-text (Groq Whisper). The key falls back to LLM__API_KEY when LLM__PROVIDER=groq.
+    stt_provider: Literal["groq"] = "groq"
+    stt_model: str = "whisper-large-v3"
+    stt_api_key: SecretStr | None = None
+    stt_base_url: str | None = None
+    # Force the decode language (ISO code, e.g. "en"); None = auto-detect per utterance.
+    stt_language: str | None = None
+    # Vocabulary hint for Whisper (domain terms, product names), e.g.
+    # "Riba, Ijarah, Murabaha, Musharakah, Mudarabah, Shariah". Clients can override per session.
+    stt_prompt: str | None = None
+    # Reliability gate: below/above these the utterance is treated as unintelligible.
+    stt_min_avg_logprob: float = -1.5
+    stt_max_no_speech_prob: float = 0.85
+    stt_timeout_s: float = 60.0
+    # Text-to-speech (Soniox). "none" = voice answers come back as text only.
+    tts_provider: Literal["soniox", "none"] = "soniox"
+    tts_model: str = "tts-rt-v2"
+    tts_api_key: SecretStr | None = None
+    tts_base_url: str | None = None
+    tts_voice: str = "Nina"
+    tts_speed: float = Field(default=0.95, ge=0.7, le=1.3)
+    # Language spoken when STT did not report one (ISO code).
+    tts_language: str = "en"
+    tts_cache_dir: str = "./data/tts-cache"
+    tts_timeout_s: float = 30.0
+    # Voice answers are spoken, so long answers are cut at a sentence boundary for speech
+    # (the full text and citations are still sent).
+    max_spoken_chars: int = Field(default=1200, ge=100)
+    # Answers are voiced in sentence groups so playback starts once the first (short) group is
+    # synthesized - Soniox REST synthesis runs at about real time - while the rest is voiced in
+    # the background.
+    tts_first_chunk_chars: int = Field(default=90, ge=20)
+    tts_chunk_chars: int = Field(default=200, ge=40)
+    # How long the browser asks the VAD to ignore detection after the assistant stops
+    # speaking (room/speaker echo tail). Sent to clients in the session_ready message.
+    echo_hold_ms: int = Field(default=500, ge=0)
+    vad: VadConfig = VadConfig()
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -182,6 +227,7 @@ class Settings(BaseSettings):
     worker: WorkerSettings = WorkerSettings()
     security: SecuritySettings = SecuritySettings()
     tokenizer: TokenizerSettings = TokenizerSettings()
+    voice: VoiceSettings = VoiceSettings()
 
     @field_validator("log_level")
     @classmethod

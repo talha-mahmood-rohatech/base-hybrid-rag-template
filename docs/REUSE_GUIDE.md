@@ -235,6 +235,43 @@ class RagClient:
         return r.json()
 ```
 
+### A10. Voice
+
+Voice reuses everything above: the same tenant key, knowledge bases, filters, citations and traces.
+
+**Option 1: streaming conversation (browser or app) over `ws(s)://<host>/v1/voice/ws`.**
+
+1. Send the first message:
+   `{"type":"start","api_key":"rag_...","knowledge_base_id":"...","stt_prompt":"Riba, Ijarah, ..."}`.
+   It authenticates the session, because browsers cannot set headers on WebSockets.
+   `filters` and `top_k` are also accepted.
+2. Stream the mic as **binary frames of 16 kHz mono PCM16LE**, about every 128 ms, while listening.
+   Make no speech/silence decisions on the client; the server's Silero VAD does that.
+3. Handle the server messages:
+
+| Message | Meaning |
+|---|---|
+| `speech_started` / `speech_ended` | The VAD's turn boundaries. Pause the mic on `speech_ended`. |
+| `transcript` | What was heard. `reliable:false` means noise or a mishearing; the server then sends `listen` without answering. |
+| `answer` | The cited answer: text, citations, `trace_id`. |
+| `say` | One piece of the spoken answer (base64 audio). Pieces arrive in order and should play queued. |
+| `listen` | The turn is over. Reopen the mic after playback ends. |
+
+4. Stop streaming the mic while the assistant speaks. When playback ends, reopen it and send
+   `{"type":"vad_hold","ms":500}`, so the speaker's echo cannot open a turn.
+5. To interrupt, stop playback and send `{"type":"barge_in"}`; the server cancels the turn.
+6. `{"type":"text","text":"..."}` sends a typed question through the same session.
+
+`app/voice/web/` (served at `/voice/`) is a complete reference client in about 250 lines of JavaScript.
+
+**Option 2: one request per question.** POST the recorded audio (any common format) to
+`/v1/voice/ask` with `knowledge_base_id`. The response contains the transcript, the cited answer and
+`audio_b64` of the spoken answer. `/v1/voice/transcribe` and `/v1/voice/speak` expose the two
+halves separately.
+
+**Vocabulary matters.** Send your domain's names and jargon as `stt_prompt` (or set
+`VOICE__STT_PROMPT`). On the ZTBL questions, exact transcriptions went from 1/8 to 7/8.
+
 ---
 
 ## Part B: Configuring and operating

@@ -51,3 +51,6 @@ desktop.ini
 
 # Tenant credentials written by scripts/load_corpus.py
 .secrets/
+
+# Reference copy of the Leap voice-agent project (own repo, contains its own .env)
+Leap-Software/

@@ -273,6 +273,33 @@ This answers "why did (or didn't) this chunk end up in the answer?" without re-r
 
 ---
 
+## 4b. Voice pipeline (`app/voice/`, ported from the Leap voice agent)
+
+```text
+browser mic --AudioWorklet--> 16 kHz PCM16 binary frames --> /v1/voice/ws (first message authenticates)
+   --> VadStream (Silero ONNX, one per connection): preroll ring, hysteresis, min speech/silence,
+       echo hold, max-utterance bound --> complete WAV per utterance
+   --> SpeechToText (Groq Whisper, verbose_json + vocabulary prompt) --> reliability gate
+       (avg_logprob, no_speech_prob, known silence hallucinations) - unreliable: listen, no reply
+   --> RAGOrchestrator.query (the same hybrid pipeline and traces as text)
+   --> for_speech (strip [n]/markdown, NFKC) --> split_for_tts (short first piece, growing pieces)
+   --> TextToSpeech (Soniox, disk cache) - pieces synthesized in parallel, sent in order as `say`
+```
+
+- **Server-side turn-taking.** The client streams audio "blind". The VAD runs Silero's 2 MB ONNX model
+  directly on onnxruntime (about 0.5 ms per 128 ms of audio). The official `silero-vad` package is not
+  used because it pulls in torch.
+- **Echo.** After the assistant stops, the client sends `vad_hold`. Detection is suppressed but capture
+  continues into the preroll, so a fast reply is not clipped.
+- **Turns are tasks.** Each turn (STT, RAG, TTS) runs as its own asyncio task. `barge_in`, `reset`
+  or a newer utterance cancel it immediately, even mid-retrieval.
+- **Streaming speech.** Soniox REST synthesis runs at about real time. The answer is therefore voiced
+  in sentence groups that grow about 1.6× each, synthesized up to 4 at a time and sent in order. Each
+  group is ready before playback reaches it, so the user hears the first sentence after about 3 s
+  instead of waiting for the whole answer.
+- **Optional.** Missing voice keys leave `container.stt/tts = None`. The text API keeps working and
+  the voice endpoints return 503.
+
 ## 5. Multi-tenancy and security model
 
 | Layer | Guarantee |

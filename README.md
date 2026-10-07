@@ -62,6 +62,7 @@ Upload (PDF/DOCX/MD/HTML/TXT) -> checksum / version -> ingestion job (PostgreSQL
 | Multi-tenancy | Tenant → KnowledgeBase → Document → DocumentVersion → Chunk. Every row/vector carries `tenant_id` + `knowledge_base_id`. The tenant is derived **only from the API key**. Filters on `tenant_id`/`knowledge_base_id` are rejected (422). Other tenants' resources return 404. Qdrant results are re-checked, and hydration re-filters by tenant in SQL. |
 | Ingestion | Checksums (SHA-256), idempotent uploads (`unchanged`), versioning with active/inactive versions, deterministic chunk ids (safe retries), page/section/char offsets, metadata and permissions preserved on chunks and payloads. Jobs run on a PostgreSQL queue (`FOR UPDATE SKIP LOCKED`) with retries and backoff, either in the API process or as a separate worker. |
 | Observability | One `retrieval_traces` row per request: query, filters, config (models, k values), dense/sparse ranks and scores, fused list with RRF scores, reranker scores, selected chunks with a `why` block, dropped chunks with a reason, context tokens, LLM model/usage/latency, raw and cleaned answer, citations, stage timings, errors/degradation. |
+| Voice | Ported from the Leap voice agent. The browser streams 16 kHz PCM over `/v1/voice/ws`; **Silero VAD** (ONNX, no torch) on the server decides turns, with an echo hold and barge-in. **Groq Whisper** STT has a reliability gate and a domain-vocabulary hint. The hybrid RAG answers with citations, and **Soniox** TTS speaks it, streamed in growing sentence groups and cached on disk. REST helpers: `/v1/voice/transcribe`, `/speak`, `/ask`. Browser demo at `/voice/`. |
 | Evaluation | Recall@K, Precision@K, Hit@K, MRR, NDCG@K, pre-rerank MRR (reranker uplift), faithfulness, answer relevance, citation precision and validity. Compares embedding models, rerankers, fusion params, dense/sparse-only, and chunking variants on isolated temporary tenants. |
 
 ## Quick start (Docker)
@@ -72,6 +73,18 @@ docker compose up -d --build    # postgres, qdrant, migrate, api (+ ollama via C
 docker compose logs -f api      # first start downloads the embedding + reranker models (~2 GB)
 python scripts/demo.py --api http://localhost:8000 --admin-key <your admin key>
 ```
+
+**Voice RAG Console:** open http://localhost:8000/ (it redirects to `/voice/`), enter a tenant key,
+pick a knowledge base, tap the mic and talk. The console shows:
+
+- live turn stages (heard, transcribed, answered, speaking) with timings;
+- the transcript with its confidence;
+- the cited answer, with clickable source chips;
+- a latency bar per turn and replay;
+- a trace inspector showing why each chunk was picked: dense and sparse ranks, RRF and reranker scores.
+
+Typed questions work too. `scripts/ui_e2e.py` drives the console in a real Edge or Chrome, with a
+TTS-spoken question as the fake microphone (`pip install playwright`). To run the voice pipeline end to end without a microphone, use `scripts/voice_e2e.py`, which speaks the questions with TTS.
 
 Services and volumes: `postgres` (`pg_data`), `qdrant` (`qdrant_data`), `api` (models in
 `model_cache`, raw uploads in `blob_data`), `ollama` (`ollama_data`). `migrate` runs
@@ -97,6 +110,8 @@ All `/v1` endpoints except `/v1/admin/*` require `X-API-Key: <tenant key>`. Admi
 | GET | `/v1/ingestion/jobs/{id}` | Job status, attempts, error, stats, stage timings |
 | POST | `/v1/rag/query` | Hybrid RAG query |
 | GET | `/v1/traces/{trace_id}` | Full retrieval trace (tenant-scoped) |
+| WS | `/v1/voice/ws` | Voice conversation: PCM in, transcripts, cited answers and speech out (protocol in `app/voice/messages.py`) |
+| POST | `/v1/voice/transcribe`, `/v1/voice/speak`, `/v1/voice/ask` | Speech-to-text, text-to-speech, and one-shot spoken question to spoken answer |
 | GET | `/health` | PostgreSQL + Qdrant checks and active model configuration |
 
 ```json

@@ -49,6 +49,23 @@ Use `filters` to narrow results, e.g. `{"document_type": "md"}` for fatwa-only a
 - Other chat models on the account can be swapped in through `LLM__MODEL`. List them with
   `GET https://api.groq.com/openai/v1/models`.
 
+## Voice
+
+Open http://localhost:8000/voice/, paste the ZTBL tenant key (`.secrets/ztbl.json`), choose
+`islamic-banking` and talk. The deployment sets `VOICE__STT_PROMPT` to ZTBL's vocabulary
+(Riba, Ijarah, Musharakah, Qarz-e-Hasna, Zarai Amadani Certificate, ...).
+
+Measured live (Soniox-spoken questions streamed through the WebSocket in real time):
+
+| | Exact transcriptions of 8 jargon-heavy questions |
+|---|---|
+| Whisper without vocabulary hint | 1 / 8 ("Musharraqa", "Karsa Hasna", "Reba al-Fadl") |
+| Whisper with the ZTBL vocabulary hint | 7 / 8 (the miss: "Salaam" for "Salam") |
+
+Per turn: the end of speech is detected about 1 s after the speaker stops (`VOICE__VAD__MIN_SILENCE_MS`),
+Whisper takes about 1 s, and the first spoken audio follows about 3 s after the answer text. The RAG
+step itself (CPU reranking) dominates, as for text queries.
+
 ## Evaluation
 
 `evals/datasets/ztbl.yaml` holds 20 golden questions covering accounts, financing limits, Islamic

@@ -13,6 +13,8 @@ from app.providers.embeddings.base import EmbeddingProvider, EmbeddingSpec
 from app.providers.llms.base import LLMProvider
 from app.providers.rerankers.base import PassthroughReranker, Reranker
 from app.providers.sparse.base import SparseSearch
+from app.providers.stt.base import SpeechToText
+from app.providers.tts.base import NoTextToSpeech, TextToSpeech
 from app.providers.vectorstores.qdrant import QdrantVectorStore
 from app.retrieval.fusion.base import FusionStrategy
 from app.retrieval.fusion.relative_score import RelativeScoreFusion
@@ -183,3 +185,35 @@ class EmbeddingProviderCache:
     async def aclose(self) -> None:
         for p in self._cache.values():
             await p.aclose()
+
+
+def build_stt(settings: Settings) -> SpeechToText:
+    v = settings.voice
+    if v.stt_provider == "groq":
+        from app.providers.stt.groq_whisper import GroqWhisperSTT
+
+        key = _secret(v.stt_api_key)
+        if not key and settings.llm.provider == "groq":
+            key = _secret(settings.llm.api_key)  # one Groq key for LLM and STT
+        return GroqWhisperSTT(v.stt_model, api_key=key, base_url=v.stt_base_url, timeout_s=v.stt_timeout_s)
+    raise ProviderConfigurationError(f"Unknown speech-to-text provider '{v.stt_provider}'")
+
+
+def build_tts(settings: Settings) -> TextToSpeech:
+    v = settings.voice
+    if v.tts_provider == "none":
+        return NoTextToSpeech()
+    if v.tts_provider == "soniox":
+        from app.providers.tts.cache import CachedTTS
+        from app.providers.tts.soniox import SonioxTTS
+
+        inner = SonioxTTS(
+            v.tts_model,
+            api_key=_secret(v.tts_api_key),
+            voice=v.tts_voice,
+            speed=v.tts_speed,
+            base_url=v.tts_base_url,
+            timeout_s=v.tts_timeout_s,
+        )
+        return CachedTTS(inner, v.tts_cache_dir)
+    raise ProviderConfigurationError(f"Unknown text-to-speech provider '{v.tts_provider}'")
