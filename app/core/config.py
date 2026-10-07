@@ -12,6 +12,7 @@ Settings are resolved in this order (highest priority first):
 from __future__ import annotations
 
 import os
+import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
@@ -200,6 +201,11 @@ class VoiceSettings(BaseModel):
     # How long the browser asks the VAD to ignore detection after the assistant stops
     # speaking (room/speaker echo tail). Sent to clients in the session_ready message.
     echo_hold_ms: int = Field(default=500, ge=0)
+    # Public assistant (the simple /voice/ page): when set, key-less voice sessions are answered
+    # from this one knowledge base. Its content becomes reachable without an API key - leave
+    # unset unless that is intended. The tenant key never reaches the browser.
+    public_knowledge_base_id: uuid.UUID | None = None
+    public_title: str = "Voice assistant"
     vad: VadConfig = VadConfig()
 
 

@@ -84,6 +84,7 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     @app.get("/", include_in_schema=False)
     async def root() -> RedirectResponse:
         return RedirectResponse("/voice/")
+
     return app
 
 

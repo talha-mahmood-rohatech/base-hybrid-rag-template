@@ -3,6 +3,7 @@
 import base64
 import io
 import time
+import uuid
 import wave
 
 import httpx
@@ -129,19 +130,51 @@ def test_voice_websocket_typed_and_spoken_turns(voice_app):
         assert [m["type"] for m in recv_until(ws, "listen")] == ["stop_audio", "listen"]
 
 
-def test_console_is_served_at_root(voice_app):
+def test_user_page_and_developer_console_are_served(voice_app):
     client, *_ = voice_app
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 307 and r.headers["location"] == "/voice/"
-    page = client.get("/voice/")
-    assert page.status_code == 200 and "Voice RAG Console" in page.text
+    user = client.get("/voice/")
+    assert user.status_code == 200 and 'id="mic"' in user.text
+    assert "trace" not in user.text.lower() and "api key" not in user.text.lower()  # no developer details
+    console = client.get("/voice/console.html")
+    assert console.status_code == 200 and "Voice RAG Console" in console.text
     for asset in (
-        "/voice/app.js",
-        "/voice/style.css",
-        "/voice/audio/mic-stream.js",
-        "/voice/audio/pcm-worklet.js",
+        "app.js",
+        "style.css",
+        "console.js",
+        "console.css",
+        "audio/mic-stream.js",
+        "audio/pcm-worklet.js",
     ):
-        assert client.get(asset).status_code == 200, asset
+        assert client.get(f"/voice/{asset}").status_code == 200, asset
+
+
+def test_public_assistant_needs_no_key_only_when_configured(voice_app):
+    client, _key, kb, *_ = voice_app
+    voice_settings = client.app.state.container.settings.voice
+    assert client.get("/v1/voice/public").json()["enabled"] is False
+    with client.websocket_connect("/v1/voice/ws") as ws:
+        ws.send_json({"type": "start"})  # no key, public mode off -> refused
+        assert ws.receive_json()["code"] == "bad_request"
+
+    voice_settings.public_knowledge_base_id = uuid.UUID(kb)
+    voice_settings.public_title = "Leasing helper"
+    try:
+        cfg = client.get("/v1/voice/public").json()
+        assert cfg == {"enabled": True, "title": "Leasing helper", "speech": True}
+        with client.websocket_connect("/v1/voice/ws") as ws:
+            # client-supplied knowledge base / filters are ignored in public mode
+            ws.send_json(
+                {"type": "start", "knowledge_base_id": str(uuid.uuid4()), "filters": {"document_type": "pdf"}}
+            )
+            assert ws.receive_json()["type"] == "ready"
+            ws.receive_json()  # listen
+            ws.send_json({"type": "text", "text": "What is Ijarah?"})
+            answer = next(m for m in recv_until(ws, "listen") if m["type"] == "answer")
+            assert "usufruct" in answer["text"]
+    finally:
+        voice_settings.public_knowledge_base_id = None
 
 
 def test_voice_websocket_rejects_bad_auth(voice_app):

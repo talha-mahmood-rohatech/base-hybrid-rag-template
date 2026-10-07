@@ -17,8 +17,9 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import TenantContext, authenticate_api_key, get_container, get_tenant
 from app.container import Container
-from app.core.errors import RAGError, ValidationError
+from app.core.errors import NotFoundError, RAGError, ValidationError
 from app.ingestion.service import get_kb
+from app.models import KnowledgeBase
 from app.voice import messages as M
 from app.voice.session import VoicePipeline, VoiceSession
 from app.voice.speech import for_speech
@@ -141,6 +142,20 @@ async def ask(
     return out
 
 
+@router.get("/public")
+async def public_config(container: Container = Depends(get_container)) -> dict[str, Any]:
+    """What the simple user page needs to know (no secrets): is a key-less assistant enabled?"""
+    v = container.settings.voice
+    enabled = (
+        v.public_knowledge_base_id is not None and container.stt is not None and container.tts is not None
+    )
+    return {
+        "enabled": enabled,
+        "title": v.public_title,
+        "speech": bool(container.tts and container.tts.enabled),
+    }
+
+
 # --- WebSocket ----------------------------------------------------------------------------
 @router.websocket("/ws")
 async def voice_ws(websocket: WebSocket) -> None:
@@ -163,13 +178,21 @@ async def voice_ws(websocket: WebSocket) -> None:
         await refuse(exc.code, exc.message, 1011)
         return
 
-    # Browsers cannot set headers on a WebSocket, so the first message authenticates.
+    # Browsers cannot set headers on a WebSocket, so the first message authenticates:
+    # {"type":"start","api_key":..,"knowledge_base_id":..} - or {"type":"start"} alone for the
+    # public assistant when VOICE__PUBLIC_KNOWLEDGE_BASE_ID is configured.
+    public_kb_id = container.settings.voice.public_knowledge_base_id
     try:
         first = await asyncio.wait_for(websocket.receive_text(), timeout=AUTH_TIMEOUT_S)
         start = json.loads(first)
-        if start.get("type") != "start" or not start.get("api_key") or not start.get("knowledge_base_id"):
+        if not isinstance(start, dict) or start.get("type") != "start":
             raise ValueError
-        kb_id = uuid.UUID(str(start["knowledge_base_id"]))
+        public = not start.get("api_key")
+        if public and public_kb_id is None:
+            raise ValueError
+        kb_id: uuid.UUID = (
+            public_kb_id if public and public_kb_id else uuid.UUID(str(start["knowledge_base_id"]))
+        )
     except (TimeoutError, ValueError, KeyError, TypeError, json.JSONDecodeError):
         await refuse(
             "bad_request", 'First message must be {"type":"start","api_key":..,"knowledge_base_id":..}', 1008
@@ -179,19 +202,29 @@ async def voice_ws(websocket: WebSocket) -> None:
         return
     try:
         async with container.session_factory() as db:
-            tenant = await authenticate_api_key(db, str(start["api_key"]))
-            kb = await get_kb(db, tenant.tenant_id, kb_id)
+            if public:
+                kb = await db.get(KnowledgeBase, kb_id)
+                if kb is None:
+                    raise NotFoundError("The public knowledge base is not available")
+                tenant_id = kb.tenant_id
+            else:
+                tenant = await authenticate_api_key(db, str(start["api_key"]))
+                kb = await get_kb(db, tenant.tenant_id, kb_id)
+                tenant_id = tenant.tenant_id
     except RAGError as exc:
         await refuse(exc.code, exc.message, 1008)
         return
 
-    filters = start.get("filters") if isinstance(start.get("filters"), dict) else {}
-    top_k = start.get("top_k") if isinstance(start.get("top_k"), int) else None
-    stt_prompt = str(start["stt_prompt"])[:896] if isinstance(start.get("stt_prompt"), str) else None
+    # Public sessions run on server settings only; authenticated clients may tune retrieval.
+    filters = start.get("filters") if not public and isinstance(start.get("filters"), dict) else {}
+    top_k = start.get("top_k") if not public and isinstance(start.get("top_k"), int) else None
+    stt_prompt = (
+        str(start["stt_prompt"])[:896] if not public and isinstance(start.get("stt_prompt"), str) else None
+    )
     session = VoiceSession(
         pipeline,
         send,
-        tenant_id=tenant.tenant_id,
+        tenant_id=tenant_id,
         knowledge_base_id=kb.id,
         filters=filters,
         top_k=top_k,

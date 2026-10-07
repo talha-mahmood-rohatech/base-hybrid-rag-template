@@ -74,17 +74,17 @@ docker compose logs -f api      # first start downloads the embedding + reranker
 python scripts/demo.py --api http://localhost:8000 --admin-key <your admin key>
 ```
 
-**Voice RAG Console:** open http://localhost:8000/ (it redirects to `/voice/`), enter a tenant key,
-pick a knowledge base, tap the mic and talk. The console shows:
+**Voice pages:**
 
-- live turn stages (heard, transcribed, answered, speaking) with timings;
-- the transcript with its confidence;
-- the cited answer, with clickable source chips;
-- a latency bar per turn and replay;
-- a trace inspector showing why each chunk was picked: dense and sparse ranks, RRF and reranker scores.
+- **User page: http://localhost:8000/** (redirects to `/voice/`). One mic button and the conversation:
+  tap, ask, hear the answer. No keys or setup. It answers from `VOICE__PUBLIC_KNOWLEDGE_BASE_ID`; or
+  share a link `/voice/?key=<tenant key>&kb=<kb id>`, which is removed from the address bar on load.
+- **Developer console: http://localhost:8000/voice/console.html.** Shows the connection settings, the
+  turn stages with timings, transcript confidence, cited sources, a latency breakdown, replay, and the
+  retrieval trace (dense and sparse ranks, RRF and reranker scores).
 
-Typed questions work too. `scripts/ui_e2e.py` drives the console in a real Edge or Chrome, with a
-TTS-spoken question as the fake microphone (`pip install playwright`). To run the voice pipeline end to end without a microphone, use `scripts/voice_e2e.py`, which speaks the questions with TTS.
+`scripts/ui_e2e.py` tests both pages in a real Edge or Chrome, with a TTS-spoken question as the
+fake microphone (`pip install playwright`). To run the voice pipeline end to end without a microphone, use `scripts/voice_e2e.py`, which speaks the questions with TTS.
 
 Services and volumes: `postgres` (`pg_data`), `qdrant` (`qdrant_data`), `api` (models in
 `model_cache`, raw uploads in `blob_data`), `ollama` (`ollama_data`). `migrate` runs

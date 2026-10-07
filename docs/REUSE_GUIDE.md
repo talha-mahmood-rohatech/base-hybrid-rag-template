@@ -262,7 +262,15 @@ Voice reuses everything above: the same tenant key, knowledge bases, filters, ci
 5. To interrupt, stop playback and send `{"type":"barge_in"}`; the server cancels the turn.
 6. `{"type":"text","text":"..."}` sends a typed question through the same session.
 
-`app/voice/web/` (served at `/voice/`) is a complete reference client in about 250 lines of JavaScript.
+`app/voice/web/` holds two reference clients:
+
+- **`index.html` + `app.js`** is the end-user page: one mic button, no settings, about 250 lines.
+- **`console.html` + `console.js`** is the developer console, with timings, sources and the trace inspector.
+
+**Public assistant.** Set `VOICE__PUBLIC_KNOWLEDGE_BASE_ID` (and `VOICE__PUBLIC_TITLE`) to let
+`{"type":"start"}` without an API key open a session on that one knowledge base. Public sessions
+ignore client filters, top-k and vocabulary; server settings apply. `GET /v1/voice/public` tells a
+page whether this mode is enabled. Use it only for content that may be public.
 
 **Option 2: one request per question.** POST the recorded audio (any common format) to
 `/v1/voice/ask` with `knowledge_base_id`. The response contains the transcript, the cited answer and

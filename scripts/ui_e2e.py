@@ -1,4 +1,4 @@
-"""Browser test of the Voice RAG Console (/voice/) - a real Edge/Chromium with a fake microphone.
+"""Browser test of the user page (/voice/) and the developer console (/voice/console.html) - a real Edge/Chromium with a fake microphone.
 
 The question is spoken by Soniox TTS into a WAV that the browser plays as its microphone, so
 the whole path runs exactly as for a user: getUserMedia -> AudioWorklet -> WebSocket PCM ->
@@ -63,8 +63,8 @@ async def main() -> None:
     from app.core.config import Settings
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tenant-slug", required=True)
-    ap.add_argument("--kb", required=True)
+    ap.add_argument("--tenant-slug", required=True, help="for the developer console")
+    ap.add_argument("--kb", required=True, help="for the developer console")
     ap.add_argument("--api", default="http://localhost:8000")
     ap.add_argument("--question", default="What is the financing limit for a rice transplanter?")
     ap.add_argument("--typed", default="How are losses shared in Musharakah?")
@@ -82,90 +82,92 @@ async def main() -> None:
     shots = ROOT / "reports" / "ui"
     shots.mkdir(parents=True, exist_ok=True)
 
-    async with async_playwright() as p:
+    flags = [
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+        f"--use-file-for-fake-audio-capture={wav}%noloop",
+        "--autoplay-policy=no-user-gesture-required",
+    ]
+    errors: list[str] = []
+    report: dict = {}
+
+    async def new_page(p, width: int, height: int):
+        # A fresh browser per page, so the fake microphone starts its recording from the top.
         browser = await p.chromium.launch(
-            channel=None if args.channel == "chromium" else args.channel,
-            headless=not args.headed,
-            args=[
-                "--use-fake-ui-for-media-stream",
-                "--use-fake-device-for-media-stream",
-                f"--use-file-for-fake-audio-capture={wav}%noloop",
-                "--autoplay-policy=no-user-gesture-required",
-            ],
+            channel=None if args.channel == "chromium" else args.channel, headless=not args.headed, args=flags
         )
-        page = await browser.new_page(viewport={"width": 1100, "height": 900})
-        errors: list[str] = []
+        page = await browser.new_page(viewport={"width": width, "height": height})
         page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
         page.on("pageerror", lambda e: errors.append(str(e)))
+        return browser, page
 
+    async with async_playwright() as p:
+        # =========================== user page: no setup, just the mic ==========================
+        browser, page = await new_page(p, 420, 860)  # phone-sized
         await page.goto(f"{args.api}/")
         assert page.url.endswith("/voice/"), page.url
+        await page.wait_for_selector("#mic:not([disabled])", timeout=20_000)
+        await page.screenshot(path=str(shots / "user-1-start.png"))
+        t0 = time.perf_counter()
+        await page.click("#mic")
+        await page.wait_for_selector(".msg.bot:not(.wait)", timeout=240_000)
+        await page.wait_for_selector("#mic.speaking", timeout=120_000)
+        user = {
+            "title": await page.text_content("#title"),
+            "question_heard": await page.text_content(".msg.me"),
+            "answer": (await page.text_content(".msg.bot")).strip(),
+            "status_while_speaking": await page.text_content("#status"),
+            "developer_details_visible": await page.locator(".cite, .sources, .timing, #api-key").count(),
+            "elapsed_s": round(time.perf_counter() - t0, 1),
+        }
+        await page.screenshot(path=str(shots / "user-2-answer.png"))
+        await page.click("#mic")  # interrupt the spoken answer
+        await page.wait_for_function(
+            "!document.querySelector('#mic').classList.contains('speaking')", timeout=10_000
+        )
+        user["interrupted_status"] = await page.text_content("#status")
+        await page.fill("#type-input", args.typed)
+        await page.press("#type-input", "Enter")
+        await page.wait_for_function(
+            "document.querySelectorAll('.msg.bot:not(.wait)').length >= 2", timeout=240_000
+        )
+        user["typed_answer"] = (await page.locator(".msg.bot").nth(1).text_content()).strip()
+        await page.wait_for_timeout(1000)
+        await page.screenshot(path=str(shots / "user-3-conversation.png"))
+        await browser.close()
+        report["user_page"] = user
+
+        # =========================== developer console ==========================================
+        browser, page = await new_page(p, 1100, 900)
+        await page.goto(f"{args.api}/voice/console.html")
         await page.fill("#api-key", api_key)
         await page.wait_for_function(
             "document.querySelector('#kb').options.length > 0 && !document.querySelector('#kb').disabled"
         )
         await page.select_option("#kb", label=args.kb)
         await page.fill("#vocab", args.vocab)
-        await page.screenshot(path=str(shots / "1-setup.png"))
         await page.click("#connect-btn")
         await page.wait_for_selector("#talk:not([hidden])", timeout=20_000)
-        pill = await page.text_content("#conn-pill")
         t0 = time.perf_counter()
-        await page.click("#mic")  # start listening; the fake mic speaks after its lead-in
-
-        # ---- spoken turn ------------------------------------------------------------------
+        await page.click("#mic")
         await page.wait_for_selector(".turn .a:not(.pending)", timeout=240_000)
         await page.wait_for_selector(".turn .replay:not([hidden])", timeout=120_000)
-        spoken = {
-            "connected": pill,
+        dev = {
             "question_heard": await page.text_content(".turn .q-text"),
-            "question_meta": await page.text_content(".turn .q-meta"),
             "answer": (await page.text_content(".turn .a-text")).strip(),
             "sources": await page.locator(".turn .sources details").count(),
-            "citation_chips": await page.locator(".turn .cite").count(),
             "timing": (await page.text_content(".turn .legend")).strip(),
-            "steps": await page.eval_on_selector_all(
-                "#steps li", "els => els.map(e => e.className + ':' + e.innerText.replace(/\\n/g,' '))"
-            ),
             "elapsed_s": round(time.perf_counter() - t0, 1),
         }
-        await page.screenshot(path=str(shots / "2-spoken-answer.png"), full_page=True)
-
-        # ---- trace inspector --------------------------------------------------------------
         await page.click(".turn .inspect")
         await page.wait_for_selector("#trace-body table tbody tr", timeout=20_000)
-        trace = {
-            "rows": await page.locator("#trace-body tbody tr").count(),
-            "picked_rows": await page.locator("#trace-body tbody tr.picked").count(),
-        }
-        await page.screenshot(path=str(shots / "3-trace.png"))
-        await page.click("#trace-close")
-
-        # ---- citation chip opens its source -----------------------------------------------
-        if spoken["citation_chips"]:
-            await page.locator(".turn .cite").first.click()
-            spoken["chip_opens_source"] = await page.locator(".turn .sources details[open]").count() > 0
-
-        # ---- typed follow-up --------------------------------------------------------------
-        await page.fill("#ask-input", args.typed)
-        await page.click("#ask-form button")
-        await page.wait_for_function(
-            "document.querySelectorAll('.turn .a:not(.pending)').length >= 2", timeout=240_000
-        )
-        typed = {
-            "question": await page.locator(".turn .q-text").nth(1).text_content(),
-            "answer": (await page.locator(".turn .a-text").nth(1).text_content()).strip(),
-            "sources": await page.locator(".turn").nth(1).locator(".sources details").count(),
-        }
-        await page.wait_for_timeout(1500)
-        await page.screenshot(path=str(shots / "4-conversation.png"), full_page=True)
+        dev["trace_rows"] = await page.locator("#trace-body tbody tr").count()
+        await page.screenshot(path=str(shots / "console-trace.png"))
         await browser.close()
+        report["developer_console"] = dev
 
-    print(
-        json.dumps(
-            {"spoken_turn": spoken, "trace": trace, "typed_turn": typed, "console_errors": errors}, indent=2
-        )
-    )
+    report["console_errors"] = errors
+    print(json.dumps(report, indent=2, ensure_ascii=False))
     print(f"screenshots: {shots}")
     if errors:
         raise SystemExit("browser console reported errors")
