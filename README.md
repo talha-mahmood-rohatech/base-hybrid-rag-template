@@ -6,6 +6,8 @@ Elasticsearch is required.
 
 **Documentation:**
 
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md): **new here? start with this.** Clone, configure,
+  run and load the ZTBL documents, step by step.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it is built (data model, ingestion and query
   pipelines, BM25/RRF/reranking details, tenancy model, design decisions).
 - [docs/REUSE_GUIDE.md](docs/REUSE_GUIDE.md): how to reuse it. Integrating a product over the
