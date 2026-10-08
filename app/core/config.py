@@ -171,7 +171,7 @@ class VoiceSettings(BaseModel):
     stt_api_key: SecretStr | None = None
     stt_base_url: str | None = None
     # Force the decode language (ISO code, e.g. "en"); None = auto-detect per utterance.
-    stt_language: str | None = "en"
+    stt_language: str | None = "ur"
     # Vocabulary hint for Whisper (domain terms, product names), e.g.
     # "Riba, Ijarah, Murabaha, Musharakah, Mudarabah, Shariah". Clients can override per session.
     stt_prompt: str | None = None
@@ -187,7 +187,7 @@ class VoiceSettings(BaseModel):
     tts_voice: str = "Nina"
     tts_speed: float = Field(default=0.95, ge=0.7, le=1.3)
     # Language spoken when STT did not report one (ISO code).
-    tts_language: str = "en"
+    tts_language: str = "ur"
     tts_cache_dir: str = "./data/tts-cache"
     tts_timeout_s: float = 30.0
     # Voice answers are spoken, so long answers are cut at a sentence boundary for speech
