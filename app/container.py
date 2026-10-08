@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
+from app.core.errors import ProviderConfigurationError
 from app.core.tokens import TokenCounter, get_token_counter
 from app.db.session import create_engine, create_session_factory
 from app.generation.context import ContextBuilder
@@ -24,10 +25,14 @@ from app.providers.registry import (
     build_llm,
     build_reranker,
     build_sparse_search,
+    build_stt,
+    build_tts,
     build_vector_store,
 )
 from app.providers.rerankers.base import Reranker
 from app.providers.sparse.base import SparseSearch
+from app.providers.stt.base import SpeechToText
+from app.providers.tts.base import TextToSpeech
 from app.providers.vectorstores.base import VectorStore
 from app.rag.orchestrator import RAGOrchestrator
 from app.retrieval.reranking.stage import RerankingStage
@@ -53,6 +58,10 @@ class Container:
     pipeline: IngestionPipeline
     worker: IngestionWorker
     orchestrator: RAGOrchestrator
+    # Voice pipeline; None when disabled or not configured (voice endpoints then return 503).
+    stt: SpeechToText | None = None
+    tts: TextToSpeech | None = None
+    voice_unavailable_reason: str | None = None
 
     @classmethod
     async def create(
@@ -63,6 +72,8 @@ class Container:
         reranker: Reranker | None = None,
         llm: LLMProvider | None = None,
         embedders: EmbeddingProviderCache | None = None,
+        stt: SpeechToText | None = None,
+        tts: TextToSpeech | None = None,
         initialize: bool = True,
     ) -> Container:
         engine = create_engine(settings.database)
@@ -89,7 +100,12 @@ class Container:
             vector_store=vector_store,
             embedders=embedders,
             sparse_search=sparse,
-            reranking=RerankingStage(reranker, include_section=settings.reranker.include_section),
+            reranking=RerankingStage(
+                reranker,
+                include_section=settings.reranker.include_section,
+                max_candidates=settings.reranker.max_candidates,
+                max_chars=settings.reranker.max_chars,
+            ),
             context_builder=ContextBuilder(
                 token_counter,
                 max_tokens=settings.context.max_context_tokens,
@@ -125,9 +141,23 @@ class Container:
             ),
             orchestrator=orchestrator,
         )
+        container._build_voice(stt, tts)
         if initialize:
             await container.initialize()
         return container
+
+    def _build_voice(self, stt: SpeechToText | None, tts: TextToSpeech | None) -> None:
+        if not self.settings.voice.enabled:
+            self.voice_unavailable_reason = "Voice is disabled (VOICE__ENABLED=false)"
+            return
+        try:
+            self.stt = stt or build_stt(self.settings)
+            self.tts = tts or build_tts(self.settings)
+        except ProviderConfigurationError as exc:
+            # Voice is optional: a missing key must not take the text API down with it.
+            self.stt = self.tts = None
+            self.voice_unavailable_reason = exc.message
+            logger.warning("voice pipeline unavailable", extra={"reason": exc.message})
 
     async def initialize(self) -> None:
         """Register the default embedding config and make sure its Qdrant collection exists."""
@@ -159,5 +189,8 @@ class Container:
         await self.embedders.aclose()
         await self.reranker.aclose()
         await self.llm.aclose()
+        for voice_provider in (self.stt, self.tts):
+            if voice_provider is not None:
+                await voice_provider.aclose()
         await self.vector_store.aclose()
         await self.engine.dispose()

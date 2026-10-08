@@ -48,3 +48,12 @@ reports/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Tenant credentials written by scripts/load_corpus.py
+.secrets/
+
+# Reference copy of the Leap voice-agent project (own repo, contains its own .env)
+Leap-Software/
+
+# Machine-specific CA bundles (see docker-compose.override.yml)
+docker/certs/

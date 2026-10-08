@@ -10,6 +10,8 @@ Elasticsearch is required.
   pipelines, BM25/RRF/reranking details, tenancy model, design decisions).
 - [docs/REUSE_GUIDE.md](docs/REUSE_GUIDE.md): how to reuse it. Integrating a product over the
   API, choosing models and operating it, and extending it with new providers or formats.
+- [docs/ZTBL.md](docs/ZTBL.md): worked example. ZTBL Islamic Banking knowledge base answered
+  with Groq.
 
 ```text
                          Product Apps
@@ -55,11 +57,12 @@ Upload (PDF/DOCX/MD/HTML/TXT) -> checksum / version -> ingestion job (PostgreSQL
 | Sparse | `SparseSearch` interface: `postgres_bm25` (default, true **Okapi BM25** computed in SQL from `tsvector` term frequencies with KB-scoped N/avgdl/df) and `postgres_fts` (`ts_rank_cd`). GIN index. |
 | Fusion | `FusionStrategy` interface: `ReciprocalRankFusion` (default, `RRF(d)=Σ w_i/(k+rank_i(d))`, k=60) and `RelativeScoreFusion`. Dense rank, sparse rank and RRF score are kept on each candidate. |
 | Reranking | `Reranker` interface: `fastembed` cross-encoder (default `jinaai/jina-reranker-v2-base-multilingual`), `cohere` (Rerank API), `none`. Both `rrf_score` and `reranker_score` are returned and traced. |
-| Generation | `LLMProvider` interface: `openai_compatible` (OpenAI, vLLM, **Ollama**), `anthropic` (Claude, default `claude-opus-5-5`), `extractive` (offline, quotes context verbatim). |
+| Generation | `LLMProvider` interface: `openai_compatible` (OpenAI, vLLM, **Ollama**), `groq` (Groq Cloud), `anthropic` (Claude, default `claude-opus-5-5`), `extractive` (offline, quotes context verbatim). |
 | Citations | The context is numbered `[1]..[n]` with document/section/page headers. Citation markers in the answer are parsed and validated. **Fabricated ids are stripped** and recorded in the trace. Each citation returns `document_id, document_name, document_version_id, chunk_id, page, section, source, snippet, rrf_score, reranker_score`. |
 | Multi-tenancy | Tenant → KnowledgeBase → Document → DocumentVersion → Chunk. Every row/vector carries `tenant_id` + `knowledge_base_id`. The tenant is derived **only from the API key**. Filters on `tenant_id`/`knowledge_base_id` are rejected (422). Other tenants' resources return 404. Qdrant results are re-checked, and hydration re-filters by tenant in SQL. |
 | Ingestion | Checksums (SHA-256), idempotent uploads (`unchanged`), versioning with active/inactive versions, deterministic chunk ids (safe retries), page/section/char offsets, metadata and permissions preserved on chunks and payloads. Jobs run on a PostgreSQL queue (`FOR UPDATE SKIP LOCKED`) with retries and backoff, either in the API process or as a separate worker. |
 | Observability | One `retrieval_traces` row per request: query, filters, config (models, k values), dense/sparse ranks and scores, fused list with RRF scores, reranker scores, selected chunks with a `why` block, dropped chunks with a reason, context tokens, LLM model/usage/latency, raw and cleaned answer, citations, stage timings, errors/degradation. |
+| Voice | Ported from the Leap voice agent. The browser streams 16 kHz PCM over `/v1/voice/ws`; **Silero VAD** (ONNX, no torch) on the server decides turns, with an echo hold and barge-in. **Groq Whisper** STT has a reliability gate and a domain-vocabulary hint. The hybrid RAG answers with citations, and **Soniox** TTS speaks it, streamed in growing sentence groups and cached on disk. REST helpers: `/v1/voice/transcribe`, `/speak`, `/ask`. Browser demo at `/voice/`. |
 | Evaluation | Recall@K, Precision@K, Hit@K, MRR, NDCG@K, pre-rerank MRR (reranker uplift), faithfulness, answer relevance, citation precision and validity. Compares embedding models, rerankers, fusion params, dense/sparse-only, and chunking variants on isolated temporary tenants. |
 
 ## Quick start (Docker)
@@ -70,6 +73,18 @@ docker compose up -d --build    # postgres, qdrant, migrate, api (+ ollama via C
 docker compose logs -f api      # first start downloads the embedding + reranker models (~2 GB)
 python scripts/demo.py --api http://localhost:8000 --admin-key <your admin key>
 ```
+
+**Voice pages:**
+
+- **User page: http://localhost:8000/** (redirects to `/voice/`). One mic button and the conversation:
+  tap, ask, hear the answer. No keys or setup. It answers from `VOICE__PUBLIC_KNOWLEDGE_BASE_ID`; or
+  share a link `/voice/?key=<tenant key>&kb=<kb id>`, which is removed from the address bar on load.
+- **Developer console: http://localhost:8000/voice/console.html.** Shows the connection settings, the
+  turn stages with timings, transcript confidence, cited sources, a latency breakdown, replay, and the
+  retrieval trace (dense and sparse ranks, RRF and reranker scores).
+
+`scripts/ui_e2e.py` tests both pages in a real Edge or Chrome, with a TTS-spoken question as the
+fake microphone (`pip install playwright`). To run the voice pipeline end to end without a microphone, use `scripts/voice_e2e.py`, which speaks the questions with TTS.
 
 Services and volumes: `postgres` (`pg_data`), `qdrant` (`qdrant_data`), `api` (models in
 `model_cache`, raw uploads in `blob_data`), `ollama` (`ollama_data`). `migrate` runs
@@ -95,6 +110,8 @@ All `/v1` endpoints except `/v1/admin/*` require `X-API-Key: <tenant key>`. Admi
 | GET | `/v1/ingestion/jobs/{id}` | Job status, attempts, error, stats, stage timings |
 | POST | `/v1/rag/query` | Hybrid RAG query |
 | GET | `/v1/traces/{trace_id}` | Full retrieval trace (tenant-scoped) |
+| WS | `/v1/voice/ws` | Voice conversation: PCM in, transcripts, cited answers and speech out (protocol in `app/voice/messages.py`) |
+| POST | `/v1/voice/transcribe`, `/v1/voice/speak`, `/v1/voice/ask` | Speech-to-text, text-to-speech, and one-shot spoken question to spoken answer |
 | GET | `/health` | PostgreSQL + Qdrant checks and active model configuration |
 
 ```json

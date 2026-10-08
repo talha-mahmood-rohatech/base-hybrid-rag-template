@@ -33,6 +33,8 @@ dependencies = [
     "python-multipart>=0.0.12",
     "pyyaml>=6.0,<7.0",
     "numpy>=1.26,<3.0",
+    # Silero VAD (app/voice/vad) runs its vendored ONNX model directly - no torch.
+    "onnxruntime>=1.16,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +53,11 @@ rag-cli = "app.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+# Voice: vendored Silero VAD model + browser demo must ship with the package.
+[tool.setuptools.package-data]
+"app.voice.vad" = ["data/*.onnx", "data/LICENSE"]
+"app.voice" = ["web/*.html", "web/*.css", "web/*.js", "web/audio/*.js"]
 
 [tool.ruff]
 target-version = "py311"

@@ -235,6 +235,51 @@ class RagClient:
         return r.json()
 ```
 
+### A10. Voice
+
+Voice reuses everything above: the same tenant key, knowledge bases, filters, citations and traces.
+
+**Option 1: streaming conversation (browser or app) over `ws(s)://<host>/v1/voice/ws`.**
+
+1. Send the first message:
+   `{"type":"start","api_key":"rag_...","knowledge_base_id":"...","stt_prompt":"Riba, Ijarah, ..."}`.
+   It authenticates the session, because browsers cannot set headers on WebSockets.
+   `filters` and `top_k` are also accepted.
+2. Stream the mic as **binary frames of 16 kHz mono PCM16LE**, about every 128 ms, while listening.
+   Make no speech/silence decisions on the client; the server's Silero VAD does that.
+3. Handle the server messages:
+
+| Message | Meaning |
+|---|---|
+| `speech_started` / `speech_ended` | The VAD's turn boundaries. Pause the mic on `speech_ended`. |
+| `transcript` | What was heard. `reliable:false` means noise or a mishearing; the server then sends `listen` without answering. |
+| `answer` | The cited answer: text, citations, `trace_id`. |
+| `say` | One piece of the spoken answer (base64 audio). Pieces arrive in order and should play queued. |
+| `listen` | The turn is over. Reopen the mic after playback ends. |
+
+4. Stop streaming the mic while the assistant speaks. When playback ends, reopen it and send
+   `{"type":"vad_hold","ms":500}`, so the speaker's echo cannot open a turn.
+5. To interrupt, stop playback and send `{"type":"barge_in"}`; the server cancels the turn.
+6. `{"type":"text","text":"..."}` sends a typed question through the same session.
+
+`app/voice/web/` holds two reference clients:
+
+- **`index.html` + `app.js`** is the end-user page: one mic button, no settings, about 250 lines.
+- **`console.html` + `console.js`** is the developer console, with timings, sources and the trace inspector.
+
+**Public assistant.** Set `VOICE__PUBLIC_KNOWLEDGE_BASE_ID` (and `VOICE__PUBLIC_TITLE`) to let
+`{"type":"start"}` without an API key open a session on that one knowledge base. Public sessions
+ignore client filters, top-k and vocabulary; server settings apply. `GET /v1/voice/public` tells a
+page whether this mode is enabled. Use it only for content that may be public.
+
+**Option 2: one request per question.** POST the recorded audio (any common format) to
+`/v1/voice/ask` with `knowledge_base_id`. The response contains the transcript, the cited answer and
+`audio_b64` of the spoken answer. `/v1/voice/transcribe` and `/v1/voice/speak` expose the two
+halves separately.
+
+**Vocabulary matters.** Send your domain's names and jargon as `stt_prompt` (or set
+`VOICE__STT_PROMPT`). On the ZTBL questions, exact transcriptions went from 1/8 to 7/8.
+
 ---
 
 ## Part B: Configuring and operating
@@ -259,7 +304,9 @@ docker compose up -d --build
 |---|---|
 | Fully local (default) | `EMBEDDING__PROVIDER=fastembed`, `EMBEDDING__MODEL=mixedbread-ai/mxbai-embed-large-v1`, `EMBEDDING__DIMENSION=1024`; `RERANKER__PROVIDER=fastembed`, `RERANKER__MODEL=jinaai/jina-reranker-v2-base-multilingual`; `LLM__PROVIDER=openai_compatible`, `LLM__BASE_URL=http://ollama:11434/v1`, `LLM__MODEL=qwen2.5:3b` |
 | OpenAI embeddings (3072-d) | `EMBEDDING__PROVIDER=openai`, `EMBEDDING__MODEL=text-embedding-3-large`, `EMBEDDING__DIMENSION=3072`, `EMBEDDING__API_KEY=...`. Chunking can return to 800/120. |
+| Groq for answers | `LLM__PROVIDER=groq`, `LLM__MODEL=<model id from GET https://api.groq.com/openai/v1/models>`, `LLM__API_KEY=gsk_...`. Drop `local-llm` from `COMPOSE_PROFILES`. Rate-limit (429) responses are retried automatically, honouring `Retry-After`. |
 | Claude for answers | `LLM__PROVIDER=anthropic`, `LLM__MODEL=claude-opus-5-5`, `LLM__API_KEY=...` (optional: `LLM__EFFORT=low\|medium\|high`) |
+| Any Hugging Face ONNX cross-encoder | `RERANKER__MODEL=<name>`, `RERANKER__ONNX_REPO=<hf repo>`, `RERANKER__ONNX_FILE=onnx/model.onnx` (+ `RERANKER__ONNX_ADDITIONAL_FILES=["onnx/model.onnx_data"]` for large exports). `BAAI/bge-reranker-v2-m3` is pre-mapped to its int8 export: just set `RERANKER__MODEL=BAAI/bge-reranker-v2-m3`. It is multilingual with 8K context, but on CPU it was ~2× slower than jina-reranker-v2 on the ZTBL eval. |
 | Hosted reranker | `RERANKER__PROVIDER=cohere`, `RERANKER__MODEL=rerank-v3.5`, `RERANKER__API_KEY=...` |
 | Self-hosted OpenAI-compatible LLM (vLLM, LM Studio) | `LLM__PROVIDER=openai_compatible`, `LLM__BASE_URL=http://host:8000/v1`, `LLM__MODEL=...` |
 | BM25 alternative | `RETRIEVAL__SPARSE_PROVIDER=postgres_fts` |
@@ -283,7 +330,7 @@ model needs instruction prefixes. Known models already have defaults in
 |---|---|
 | Ingestion throughput | Set `WORKER__EMBEDDED=false` on `api` and run N `worker` containers (`docker compose --profile worker up -d --scale worker=N`). Jobs are claimed with `SKIP LOCKED`. |
 | Query throughput | Run more `api` replicas behind a load balancer. They are stateless; models load per replica. |
-| Latency | Use a GPU or hosted LLM (generation dominates), reduce `top_k`, use a smaller reranker (`Xenova/ms-marco-MiniLM-L-12-v2`), or set `rerank:false` for latency-critical paths. |
+| Latency | On CPU the cross-encoder usually dominates; its cost grows with candidates × passage length. Set `RERANKER__MAX_CANDIDATES=20` (on the ZTBL eval, same quality as 40 at ~2.5× lower latency), use a smaller reranker (`Xenova/ms-marco-MiniLM-L-12-v2`, ~3× faster, slightly lower quality), run the reranker on a GPU or as a hosted API (`cohere`), or set `rerank:false` for latency-critical paths. `RERANKER__MAX_CHARS` truncates reranker input but measurably lowered quality on ZTBL. A hosted LLM (Groq, Anthropic, OpenAI) keeps generation under a few seconds. |
 | Large vector collections | `QDRANT__ON_DISK_VECTORS=true`, tune `QDRANT__HNSW_M` / `QDRANT__SEARCH_HNSW_EF`, or run a Qdrant cluster. |
 | Multi-node file storage | Implement `BlobStore` for S3/GCS (`app/ingestion/blobstore.py`). |
 

@@ -13,6 +13,8 @@ from app.providers.embeddings.base import EmbeddingProvider, EmbeddingSpec
 from app.providers.llms.base import LLMProvider
 from app.providers.rerankers.base import PassthroughReranker, Reranker
 from app.providers.sparse.base import SparseSearch
+from app.providers.stt.base import SpeechToText
+from app.providers.tts.base import NoTextToSpeech, TextToSpeech
 from app.providers.vectorstores.qdrant import QdrantVectorStore
 from app.retrieval.fusion.base import FusionStrategy
 from app.retrieval.fusion.relative_score import RelativeScoreFusion
@@ -73,7 +75,12 @@ def build_reranker(settings: RerankerSettings) -> Reranker:
         from app.providers.rerankers.fastembed_reranker import FastEmbedCrossEncoderReranker
 
         return FastEmbedCrossEncoderReranker(
-            settings.model, batch_size=settings.batch_size, cache_dir=model_cache_dir()
+            settings.model,
+            batch_size=settings.batch_size,
+            cache_dir=model_cache_dir(),
+            onnx_repo=settings.onnx_repo,
+            onnx_file=settings.onnx_file,
+            onnx_additional_files=settings.onnx_additional_files,
         )
     if settings.provider == "cohere":
         from app.providers.rerankers.cohere_reranker import CohereReranker
@@ -95,6 +102,16 @@ def build_llm(settings: LLMSettings) -> LLMProvider:
             settings.model,
             base_url=settings.base_url,
             api_key=_secret(settings.api_key),
+            timeout_s=settings.timeout_s,
+        )
+    if settings.provider == "groq":
+        from app.providers.llms.openai_compatible import GroqLLM
+
+        return GroqLLM(
+            settings.model,
+            api_key=_secret(settings.api_key),
+            # LLM__BASE_URL defaults to the local Ollama URL; only honour it if it points at Groq.
+            base_url=settings.base_url if settings.base_url and "groq" in settings.base_url else None,
             timeout_s=settings.timeout_s,
         )
     if settings.provider == "anthropic":
@@ -168,3 +185,35 @@ class EmbeddingProviderCache:
     async def aclose(self) -> None:
         for p in self._cache.values():
             await p.aclose()
+
+
+def build_stt(settings: Settings) -> SpeechToText:
+    v = settings.voice
+    if v.stt_provider == "groq":
+        from app.providers.stt.groq_whisper import GroqWhisperSTT
+
+        key = _secret(v.stt_api_key)
+        if not key and settings.llm.provider == "groq":
+            key = _secret(settings.llm.api_key)  # one Groq key for LLM and STT
+        return GroqWhisperSTT(v.stt_model, api_key=key, base_url=v.stt_base_url, timeout_s=v.stt_timeout_s)
+    raise ProviderConfigurationError(f"Unknown speech-to-text provider '{v.stt_provider}'")
+
+
+def build_tts(settings: Settings) -> TextToSpeech:
+    v = settings.voice
+    if v.tts_provider == "none":
+        return NoTextToSpeech()
+    if v.tts_provider == "soniox":
+        from app.providers.tts.cache import CachedTTS
+        from app.providers.tts.soniox import SonioxTTS
+
+        inner = SonioxTTS(
+            v.tts_model,
+            api_key=_secret(v.tts_api_key),
+            voice=v.tts_voice,
+            speed=v.tts_speed,
+            base_url=v.tts_base_url,
+            timeout_s=v.tts_timeout_s,
+        )
+        return CachedTTS(inner, v.tts_cache_dir)
+    raise ProviderConfigurationError(f"Unknown text-to-speech provider '{v.tts_provider}'")

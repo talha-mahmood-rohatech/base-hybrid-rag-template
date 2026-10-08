@@ -1,0 +1,75 @@
+# Golden set for the ZTBL Islamic Banking knowledge base (corpora/ztbl/).
+# Relevance = document + a snippet that must appear in the retrieved chunk.
+name: ztbl-islamic-banking
+documents:
+  - {external_id: ztbl_faqs, path: ../../corpora/ztbl/ZTBL_FAQs_Islamic_Banking.docx}
+  - {external_id: ztbl_fatwa, path: ../../corpora/ztbl/ZTBL_Shariah_Fatwa.md}
+
+queries:
+  # --- Products: accounts & deposits
+  - id: acct-current-min
+    query: What is the minimum initial deposit to open an Islamic Current Account?
+    relevant: [{external_id: ztbl_faqs, contains: "minimum initial deposit will be Rs. 500"}]
+  - id: acct-assan-limit
+    query: What is the maximum credit balance allowed in an Assan Islamic account?
+    relevant: [{external_id: ztbl_faqs, contains: "Rs.1,000,000"}]
+  - id: acct-bakht-profit
+    query: How much extra profit does the Bakht Islamic Saving Account pay?
+    relevant: [{external_id: ztbl_faqs, contains: "100 bps profit"}]
+  - id: acct-bakht-locker
+    query: What balance do I need to keep in a Bakht account to get a free locker?
+    relevant: [{external_id: ztbl_faqs, contains: "Free Locker Facility upon maintaining an average balance of PKR 500,000"}]
+  - id: deposit-special-itdc
+    query: What is the minimum investment for a Special Islamic Term Deposit Certificate?
+    relevant: [{external_id: ztbl_faqs, contains: "2,500,000"}]
+  - id: deposit-amadani-tenor
+    query: For how many years can I invest in the Zarai Amadani Certificate?
+    relevant: [{external_id: ztbl_faqs, contains: "minimum 3 years and maximum 5 years"}]
+  - id: acct-basic-closure
+    query: When will a Basic Islamic Banking Account be closed automatically?
+    relevant: [{external_id: ztbl_faqs, contains: "for a continuous six-month period"}]
+
+  # --- Products: financing limits
+  - id: fin-rice-transplanter
+    query: What is the financing limit for a rice transplanter?
+    relevant: [{external_id: ztbl_faqs, contains: "PKR 4.600 Million"}]
+  - id: fin-loader-rickshaw
+    query: How much financing can a farmer get for a loader rickshaw?
+    relevant: [{external_id: ztbl_faqs, contains: "PKR 0.500 Million"}]
+  - id: fin-yak-per-head
+    query: What is the credit ceiling per yak animal?
+    relevant: [{external_id: ztbl_faqs, contains: "Rs. 125,000"}]
+  - id: fin-yak-structure
+    query: How is yak farming financing structured in a Shariah compliant way?
+    relevant: [{external_id: ztbl_faqs, contains: "Sale & Lease arrangements of customer land"}]
+  - id: fin-women
+    query: Is there a financing scheme for women farmers and what is its limit?
+    relevant: [{external_id: ztbl_faqs, contains: "PKR 2.5 Million per customer"}]
+
+  # --- Concepts (FAQ)
+  - id: faq-riba-kinds
+    query: What are the two kinds of riba?
+    relevant: [{external_id: ztbl_faqs, contains: "Riba-Al-Fadl"}]
+  - id: faq-mudarabah-roles
+    query: In Mudarabah, who provides the capital and who bears the loss?
+    relevant: [{external_id: ztbl_faqs, contains: "Rab-ul-Maal"}]
+  - id: faq-ijarah
+    query: What is Ijarah?
+    relevant: [{external_id: ztbl_faqs, contains: "transferring the usufruct"}]
+  - id: faq-salam
+    query: What is a Salam contract?
+    relevant: [{external_id: ztbl_faqs, contains: "advance payment is made for goods to be delivered at a future date"}]
+  - id: faq-murabaha
+    query: How does Murabaha work?
+    relevant: [{external_id: ztbl_faqs, contains: "discloses the cost of the commodity"}]
+  - id: faq-musharakah-loss
+    query: How are losses shared between partners in Musharakah?
+    relevant: [{external_id: ztbl_faqs, contains: "Loss is distributed exactly according to the ratio of investment"}]
+  - id: faq-late-payment
+    query: What happens to the late payment penalty charged by an Islamic bank?
+    relevant: [{external_id: ztbl_faqs, contains: "penalty proceeds would be used for charity"}]
+
+  # --- Fatwa
+  - id: fatwa-board
+    query: Who are the members of ZTBL's Shariah Board?
+    relevant: [{external_id: ztbl_fatwa, contains: "Ashraf Usmani"}]

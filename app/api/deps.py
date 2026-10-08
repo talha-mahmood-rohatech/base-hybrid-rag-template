@@ -37,11 +37,16 @@ async def get_tenant(
     """Resolve the tenant from the API key. Tenant identity is never taken from the request body."""
     if not x_api_key:
         raise AuthenticationError("Missing X-API-Key header")
+    return await authenticate_api_key(session, x_api_key)
+
+
+async def authenticate_api_key(session: AsyncSession, api_key: str) -> TenantContext:
+    """Shared by HTTP (X-API-Key header) and WebSocket (first message) authentication."""
     row = (
         await session.execute(
             select(ApiKey, Tenant)
             .join(Tenant, Tenant.id == ApiKey.tenant_id)
-            .where(ApiKey.key_hash == hash_api_key(x_api_key), ApiKey.revoked_at.is_(None))
+            .where(ApiKey.key_hash == hash_api_key(api_key), ApiKey.revoked_at.is_(None))
         )
     ).first()
     if row is None or not row.Tenant.is_active:

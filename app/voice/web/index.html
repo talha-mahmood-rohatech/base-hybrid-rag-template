@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Voice assistant</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%232f6fed%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/voice/style.css">
+</head>
+<body>
+  <header><h1 id="title">Voice assistant</h1></header>
+
+  <main id="chat" aria-live="polite">
+    <p id="hello" class="hello">Tap the microphone and ask your question.</p>
+  </main>
+
+  <footer>
+    <button id="mic" type="button" aria-label="Tap to talk" disabled>
+      <span class="ring" aria-hidden="true"></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+    </button>
+    <p id="status" class="status">Connecting…</p>
+    <form id="type-form" class="type" hidden>
+      <input id="type-input" placeholder="Or type your question" autocomplete="off" aria-label="Type your question">
+      <button type="submit" aria-label="Send">➤</button>
+    </form>
+  </footer>
+
+  <script src="/voice/audio/mic-stream.js"></script>
+  <script src="/voice/app.js"></script>
+</body>
+</html>
